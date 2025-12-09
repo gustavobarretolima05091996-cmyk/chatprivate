@@ -13,12 +13,14 @@ dependencies:
   cupertino_icons: ^1.0.8
 
   # Novas dependências para o chat
-  http: ^1.1.0
+  http: 0.13.6
   provider: ^6.0.7
   flutter_secure_storage: ^8.1.0
   uuid: ^4.5.2
   shared_preferences: ^2.2.2
   url_launcher: ^6.2.5
+  signalr_core: ^1.1.0
+  signalr_netcore: ^1.0.7
 
 dev_dependencies:
   flutter_test:

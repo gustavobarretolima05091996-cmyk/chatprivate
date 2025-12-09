@@ -1,9 +1,11 @@
 import 'dart:math';
 import 'package:flutter/material.dart';
+import '../services/SignalRService.dart';
 import '../services/api_service.dart';
 import '../models/message.dart';
 import '../services/auth_service.dart';
 
+// Usuários e cores fake
 final List<String> randomNames = [
   "Lucas", "Amanda", "Bruno", "Carla", "Diego", "Elisa",
   "Felipe", "Giovana", "Henrique", "Isabela", "João", "Karina",
@@ -11,19 +13,11 @@ final List<String> randomNames = [
   "Samuel", "Tatiane", "Victor", "Yasmin", "Thiago", "Camila",
 ];
 
-// CORES PARA SIMULAR VÁRIAS PESSOAS
 final List<Color> userColors = [
-  Colors.blue,
-  Colors.green,
-  Colors.purple,
-  Colors.orange,
-  Colors.red,
-  Colors.teal,
-  Colors.indigo,
-  Colors.brown,
+  Colors.blue, Colors.green, Colors.purple, Colors.orange,
+  Colors.red, Colors.teal, Colors.indigo, Colors.brown,
 ];
 
-// Cada mensagem terá um perfil fake fixo
 Map<String, Map<String, dynamic>> fakeProfiles = {};
 
 class ChatScreen extends StatefulWidget {
@@ -36,84 +30,93 @@ class ChatScreen extends StatefulWidget {
 class _ChatScreenState extends State<ChatScreen> {
   final TextEditingController msgCtrl = TextEditingController();
   final ScrollController _scrollCtrl = ScrollController();
-  List<Message> msgs = [];
+  final SignalRService signalRService = SignalRService();
 
+  List<Message> msgs = [];
   String? sender;
   bool _loading = false;
 
   @override
   void initState() {
     super.initState();
-    _load();
+    _initChat();
   }
 
   @override
   void dispose() {
     msgCtrl.dispose();
     _scrollCtrl.dispose();
+    signalRService.dispose();
     super.dispose();
   }
 
-  // Cria um usuário fake para cada mensagem
-  Map<String, dynamic> _getFakeProfile(String msgId) {
-    if (fakeProfiles.containsKey(msgId)) {
-      return fakeProfiles[msgId]!;
-    }
-
-    randomNames.shuffle();
-    userColors.shuffle();
-
-    final newProfile = {
-      "name": randomNames.first,
-      "color": userColors.first,
-    };
-
-    fakeProfiles[msgId] = newProfile;
-    return newProfile;
-  }
-
-  Future<void> _load() async {
+  Future<void> _initChat() async {
     sender = await AuthService.getRole();
+    if (sender == null) return;
 
-    if (sender == null) {
-      print("ERRO: usuário não logado.");
-      return;
-    }
+    await signalRService.init(sender!);
 
+    // Ouvir mensagens ao vivo
+    signalRService.messages.listen((msg) {
+      setState(() => msgs.add(msg));
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (_scrollCtrl.hasClients) {
+          _scrollCtrl.animateTo(
+            _scrollCtrl.position.maxScrollExtent,
+            duration: const Duration(milliseconds: 200),
+            curve: Curves.easeOut,
+          );
+        }
+      });
+    });
+
+    // Opcional: carregar mensagens antigas do backend
     final fetched = await ApiService.getMessages();
     setState(() => msgs = fetched);
-
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (_scrollCtrl.hasClients) {
-        _scrollCtrl.jumpTo(_scrollCtrl.position.maxScrollExtent);
-      }
-    });
   }
 
-  Future<void> send(bool singleView) async {
+  Future<void> send(bool oneTime) async {
     final text = msgCtrl.text.trim();
-    if (text.isEmpty) return;
+    if (text.isEmpty || sender == null) return;
 
     setState(() => _loading = true);
 
+    final msg = Message(
+      id: DateTime.now().millisecondsSinceEpoch.toString(),
+      sender: sender!,
+      text: text,
+      oneTimeView: oneTime,
+      opened: false,
+    );
+
     try {
-      await ApiService.sendMessage(text, singleView, sender!);
+      await signalRService.sendMessage(msg);
       msgCtrl.clear();
-      await _load();
     } finally {
       if (mounted) setState(() => _loading = false);
     }
   }
 
+  Map<String, dynamic> _getFakeProfile(String msgId) {
+    if (fakeProfiles.containsKey(msgId)) return fakeProfiles[msgId]!;
+
+    randomNames.shuffle();
+    userColors.shuffle();
+    final profile = {
+      "name": randomNames.first,
+      "color": userColors.first,
+    };
+    fakeProfiles[msgId] = profile;
+    return profile;
+  }
+
   Future<void> _viewOneTime(Message m) async {
     final fake = _getFakeProfile(m.id);
-    final senderName = fake['name'];
 
-    // mostra o conteúdo
     await showDialog(
       context: context,
       builder: (_) => AlertDialog(
-        title: Text("$senderName (visualização única)"),
+        title: Text("${fake['name']} (visualização única)"),
         content: Text(m.text),
         actions: [
           TextButton(
@@ -125,19 +128,12 @@ class _ChatScreenState extends State<ChatScreen> {
     );
 
     try {
-      // marca como aberta no backend (PUT /messages/{id}/opened)
       await ApiService.markAsOpened(m.id);
-
-      // Atualiza localmente para refletir imediatamente a mudança sem depender só do reload
       setState(() {
         final idx = msgs.indexWhere((x) => x.id == m.id);
         if (idx != -1) msgs[idx] = msgs[idx].copyWith(opened: true);
       });
-
-      // Se quiser recarregar do servidor (opcional)
-      // await _load();
     } catch (e) {
-      // tratar erro se quiser
       print("Erro ao marcar como aberta: $e");
     }
   }
@@ -164,31 +160,23 @@ class _ChatScreenState extends State<ChatScreen> {
                   content: const Text("Isso vai apagar TODAS as mensagens."),
                   actions: [
                     TextButton(
-                      onPressed: () => Navigator.pop(context, false),
-                      child: const Text("Cancelar"),
-                    ),
+                        onPressed: () => Navigator.pop(context, false),
+                        child: const Text("Cancelar")),
                     TextButton(
-                      onPressed: () => Navigator.pop(context, true),
-                      child: const Text("Apagar"),
-                    )
+                        onPressed: () => Navigator.pop(context, true),
+                        child: const Text("Apagar"))
                   ],
                 ),
               );
-
               if (confirm == true) {
                 await ApiService.clearMessages();
-                await _load();
+                setState(() => msgs.clear());
               }
             },
           ),
-
-          IconButton(
-            icon: const Icon(Icons.logout),
-            onPressed: _logout,
-          ),
+          IconButton(icon: const Icon(Icons.logout), onPressed: _logout),
         ],
       ),
-
       body: Column(
         children: [
           Expanded(
@@ -199,12 +187,9 @@ class _ChatScreenState extends State<ChatScreen> {
               itemBuilder: (context, index) {
                 final m = msgs[index];
                 final isMine = m.sender == sender;
-
-                // pega o fake user dessa mensagem
                 final fake = _getFakeProfile(m.id);
 
-                // VISUALIZAÇÃO ÚNICA
-                if (m.singleView) {
+                if (m.oneTimeView) {
                   return Align(
                     alignment: isMine ? Alignment.centerRight : Alignment.centerLeft,
                     child: Container(
@@ -217,33 +202,19 @@ class _ChatScreenState extends State<ChatScreen> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(
-                            fake["name"],
-                            style: TextStyle(
-                              fontWeight: FontWeight.bold,
-                              color: fake["color"],
-                            ),
-                          ),
-                          const SizedBox(height: 6),
-
-                          // AGORA MOSTRA "Visualização única aberta"
-                          if (m.opened)
-                            const Text(
-                              "Visualização única aberta",
+                          Text(fake["name"],
                               style: TextStyle(
-                                fontStyle: FontStyle.italic,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            )
-
-                          // Se for minha mensagem e ainda não abriu
+                                  fontWeight: FontWeight.bold,
+                                  color: fake["color"])),
+                          const SizedBox(height: 6),
+                          if (m.opened)
+                            const Text("Visualização única aberta",
+                                style: TextStyle(
+                                    fontStyle: FontStyle.italic,
+                                    fontWeight: FontWeight.w600))
                           else if (isMine)
-                            const Text(
-                              "Visualização única enviada",
-                              style: TextStyle(fontStyle: FontStyle.italic),
-                            )
-
-                          // Se for do outro e ainda não abriu
+                            const Text("Visualização única enviada",
+                                style: TextStyle(fontStyle: FontStyle.italic))
                           else
                             ElevatedButton(
                               onPressed: () => _viewOneTime(m),
@@ -255,7 +226,6 @@ class _ChatScreenState extends State<ChatScreen> {
                   );
                 }
 
-                // MENSAGEM NORMAL
                 return Align(
                   alignment: isMine ? Alignment.centerRight : Alignment.centerLeft,
                   child: Container(
@@ -268,13 +238,9 @@ class _ChatScreenState extends State<ChatScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          fake["name"],
-                          style: TextStyle(
-                            color: fake["color"],
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
+                        Text(fake["name"],
+                            style: TextStyle(
+                                color: fake["color"], fontWeight: FontWeight.bold)),
                         const SizedBox(height: 6),
                         Text(m.text),
                       ],
@@ -284,10 +250,7 @@ class _ChatScreenState extends State<ChatScreen> {
               },
             ),
           ),
-
-          // CAMPO DE DIGITAÇÃO
           const Divider(height: 1),
-
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
             child: Row(
@@ -296,9 +259,7 @@ class _ChatScreenState extends State<ChatScreen> {
                   child: TextField(
                     controller: msgCtrl,
                     decoration: const InputDecoration(
-                      hintText: "Mensagem",
-                      border: InputBorder.none,
-                    ),
+                        hintText: "Mensagem", border: InputBorder.none),
                   ),
                 ),
                 IconButton(

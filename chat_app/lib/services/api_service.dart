@@ -6,6 +6,7 @@ import '../models/message.dart';
 
 class ApiService {
   static const API_BASE = "https://chat.trampeiservicos.com.br";
+  //static const API_BASE = "https://10.0.2.2:7215";
 
   static Map<String, String> get headers => {
     "Content-Type": "application/json",
