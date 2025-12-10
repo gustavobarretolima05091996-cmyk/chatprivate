@@ -34,7 +34,7 @@ class MyApp extends StatelessWidget {
         primarySwatch: Colors.deepOrange,
         scaffoldBackgroundColor: Colors.grey.shade100,
       ),
-      home: const HomeScreen(), // ⬅️ AGORA A HOME É A TELA INICIAL
+      home:  HomeScreen(), // ⬅️ AGORA A HOME É A TELA INICIAL
     );
   }
 }

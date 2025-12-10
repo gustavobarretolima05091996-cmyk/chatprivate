@@ -1,56 +1,87 @@
 import 'dart:convert';
+import 'dart:math';
 import 'package:flutter/material.dart';
-import 'login_screen.dart';
+import 'login_screen.dart'; // Certifique-se de que este arquivo existe
 
 class HomeScreen extends StatelessWidget {
-  const HomeScreen({super.key});
+  HomeScreen({super.key});
 
-  // Lista de dicas (pode ter quantas quiser)
-  final List<Map<String, String>> dicas = const [
-    {
-      "title": "Dica 1",
-      "content": "Sempre mantenha seu MIUI atualizado para evitar problemas de segurança."
-    },
-    {
-      "title": "Dica 2",
-      "content": "Use temas e widgets personalizados para deixar sua tela inicial mais funcional."
-    },
-    {
-      "title": "Dica 3",
-      "content": "Ative o modo de economia de bateria para prolongar o uso do aparelho."
-    },
-    {
-      "title": "Dica 4",
-      "content": "Faça backup dos seus dados regularmente usando Mi Cloud ou Google Drive."
-    },
-    {
-      "title": "Dica 5",
-      "content": "Limpe o cache dos aplicativos para manter o celular rápido."
-    },
-    {
-      "title": "Dica 6",
-      "content": "Use senhas fortes e autenticação de dois fatores para sua conta Mi."
-    },
-    {
-      "title": "Dica 7",
-      "content": "Explore os recursos de câmera do MIUI para tirar fotos profissionais."
-    },
-    {
-      "title": "Dica 8",
-      "content": "Personalize gestos e atalhos para acessar funções rapidamente."
-    },
-    {
-      "title": "Dica 9",
-      "content": "Mantenha os aplicativos atualizados para corrigir bugs e melhorar a segurança."
-    },
-    {
-      "title": "Dica 10",
-      "content": "Use aplicativos de terceiros com cuidado e revise permissões antes de instalar."
-    },
+  final Random random = Random();
+
+  // Usuários exemplo
+  final List<String> postUsers = [
+    "TechMaster", "XiaomiLover", "GadgetHead", "MiFan", "RedmiKing",
+    "SmartGuru", "MiAddict", "RedmiFan", "PocoMan", "TechGeek"
   ];
+
+  // Títulos exemplo
+  final List<String> postTitles = [
+    "MIUI 15 chegou! Veja todas as novidades 🔥",
+    "Meu setup com Redmi Note 13 Pro 📸",
+    "Vale a pena trocar o Poco X5 pelo X6?",
+    "Top 5 apps essenciais para seu Xiaomi",
+    "Como ativar recursos secretos do MIUI",
+    "Dicas para fotos profissionais com Xiaomi",
+    "Customizando widgets e temas na MIUI",
+    "Como prolongar a bateria do seu Redmi",
+    "Explorando a câmera do Xiaomi 13 Pro",
+    "Apps de produtividade que valem a pena",
+    "Configurações ocultas do MIUI que você precisa conhecer",
+    "Testando a nova MIUI 15 beta",
+    "Segredos do Always-On Display",
+    "Personalize seus ícones e temas",
+    "Otimize seu Redmi para jogos",
+    "Backup e sincronização na nuvem",
+    "Segurança e privacidade no MIUI",
+    "Melhores widgets para produtividade",
+    "Ajustes de câmera para fotos noturnas",
+    "Dicas para prolongar a vida útil da bateria"
+  ];
+
+  // Imagens base64 de exemplo
+  final List<String> postImages = [post1Base64, post2Base64, post3Base64, ""];
+
+  // ===== 50 posts de exemplo =====
+  late final List<Map<String, dynamic>> allPosts = List.generate(50, (_) {
+    final rnd = Random();
+    return {
+      "user": postUsers[rnd.nextInt(postUsers.length)],
+      "avatarBase64": avatar1Base64,
+      "title": postTitles[rnd.nextInt(postTitles.length)],
+      "likes": rnd.nextInt(500),
+      "comments": rnd.nextInt(100),
+      "imageBase64": postImages[rnd.nextInt(postImages.length)],
+      "time": randomHoursAgo(),
+    };
+  });
+
+  // ===== 50 dicas de exemplo =====
+  late final List<Map<String, String>> allDicas = List.generate(50, (i) {
+    final rnd = Random();
+    return {
+      "title": "Dica ${i + 1}",
+      "content": "Conteúdo da dica número ${i + 1} sobre Xiaomi, MIUI ou dispositivos.",
+      "image": i % 3 == 0 ? postImages[rnd.nextInt(postImages.length)] : ""
+    };
+  });
+
+  static String randomHoursAgo() {
+    final rnd = Random();
+    int hours = rnd.nextInt(24);
+    if (hours == 0) return "Agora";
+    return "$hours hora${hours > 1 ? 's' : ''} atrás";
+  }
 
   @override
   Widget build(BuildContext context) {
+    // Sortear 3 posts aleatórios
+    final posts = List<Map<String, dynamic>>.from(allPosts)..shuffle();
+    final postsSelecionados = posts.take(3).toList();
+
+    // Sortear 10 dicas aleatórias
+    final dicas = List<Map<String, String>>.from(allDicas)..shuffle();
+    final dicasSelecionadas = dicas.take(10).toList();
+
     return Scaffold(
       backgroundColor: Colors.grey.shade100,
       appBar: AppBar(
@@ -62,77 +93,56 @@ class HomeScreen extends StatelessWidget {
             onPressed: () {
               Navigator.push(
                 context,
-                MaterialPageRoute(builder: (_) => const LoginScreen()),
+                MaterialPageRoute(builder: (_) => LoginScreen()),
               );
             },
             icon: const Icon(Icons.person),
           )
         ],
       ),
-
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          // ==== BANNER BASE64 ====
-          ClipRRect(
-            borderRadius: BorderRadius.circular(14),
-            child: Image.memory(
-              base64Decode(bannerBase64),
-              height: 180,
-              width: double.infinity,
-              fit: BoxFit.cover,
+          // Banner
+          if (bannerBase64.isNotEmpty)
+            ClipRRect(
+              borderRadius: BorderRadius.circular(14),
+              child: Image.memory(
+                base64Decode(bannerBase64),
+                height: 180,
+                width: double.infinity,
+                fit: BoxFit.cover,
+              ),
             ),
-          ),
-
           const SizedBox(height: 20),
-
           const Text(
             "Destaques da Comunidade",
             style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
           ),
-
           const SizedBox(height: 16),
 
-          // ==== POSTS ====
-          _postCard(
-            user: "TechMaster",
-            avatarBase64: avatar1Base64,
-            title: "MIUI 15 chegou! Veja todas as novidades 🔥",
-            likes: 231,
-            comments: 54,
-            imageBase64: post1Base64,
-          ),
-
-          _postCard(
-            user: "XiaomiLover",
-            avatarBase64: avatar1Base64,
-            title: "Meu setup com Redmi Note 13 Pro 📸",
-            likes: 104,
-            comments: 19,
-            imageBase64: post2Base64,
-          ),
-
-          _postCard(
-            user: "GadgetHead",
-            avatarBase64: avatar1Base64,
-            title: "Vale a pena trocar o Poco X5 pelo X6?",
-            likes: 67,
-            comments: 12,
-            imageBase64: post3Base64,
-          ),
+          // Posts sorteados
+          ...postsSelecionados.map((post) => _postCard(
+            user: post["user"],
+            avatarBase64: post["avatarBase64"],
+            title: post["title"],
+            likes: post["likes"],
+            comments: post["comments"],
+            imageBase64: post["imageBase64"],
+            time: post["time"],
+          )),
 
           const SizedBox(height: 40),
-
-          // ==== NOVA SEÇÃO DE TEXTOS DINÂMICA ====
           const Text(
             "Informações e Dicas",
             style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 16),
 
-          ...dicas.map((dica) => _textCard(
+          // Dicas sorteadas
+          ...dicasSelecionadas.map((dica) => _textCard(
             title: dica["title"]!,
-            content: dica["content"]!,
+            content: dica["content"]!
           )),
 
           const SizedBox(height: 40),
@@ -148,6 +158,7 @@ class HomeScreen extends StatelessWidget {
     required int likes,
     required int comments,
     required String imageBase64,
+    required String time,
   }) {
     return Container(
       margin: const EdgeInsets.only(bottom: 20),
@@ -169,46 +180,46 @@ class HomeScreen extends StatelessWidget {
             leading: CircleAvatar(
               backgroundImage: MemoryImage(base64Decode(avatarBase64)),
             ),
-            title: Text(user, style: const TextStyle(fontWeight: FontWeight.bold)),
-            subtitle: const Text("1 hora atrás"),
+            title: Text(user,
+                style: const TextStyle(fontWeight: FontWeight.bold)),
+            subtitle: Text(time),
           ),
-
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16.0),
             child: Text(title, style: const TextStyle(fontSize: 16)),
           ),
-
           const SizedBox(height: 12),
-
-          ClipRRect(
-            borderRadius: BorderRadius.circular(12),
-            child: Image.memory(base64Decode(imageBase64)),
-          ),
-
+          if (imageBase64.isNotEmpty)
+            ClipRRect(
+              borderRadius: BorderRadius.circular(12),
+              child: Image.memory(base64Decode(imageBase64)),
+            ),
           const SizedBox(height: 8),
-
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             child: Row(
               children: [
-                Icon(Icons.thumb_up_alt_outlined, size: 20, color: Colors.grey.shade700),
+                Icon(Icons.thumb_up_alt_outlined,
+                    size: 20, color: Colors.grey.shade700),
                 const SizedBox(width: 4),
                 Text("$likes"),
-
                 const SizedBox(width: 16),
-
-                Icon(Icons.message_outlined, size: 20, color: Colors.grey.shade700),
+                Icon(Icons.message_outlined,
+                    size: 20, color: Colors.grey.shade700),
                 const SizedBox(width: 4),
                 Text("$comments"),
               ],
             ),
-          )
+          ),
         ],
       ),
     );
   }
 
-  Widget _textCard({required String title, required String content}) {
+  Widget _textCard({
+    required String title,
+    required String content
+  }) {
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
       padding: const EdgeInsets.all(16),
@@ -226,7 +237,9 @@ class HomeScreen extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(title, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+          Text(title,
+              style:
+              const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
           const SizedBox(height: 8),
           Text(content, style: const TextStyle(fontSize: 16, color: Colors.grey)),
         ],
@@ -234,7 +247,6 @@ class HomeScreen extends StatelessWidget {
     );
   }
 }
-
 
 
 // ====== EXEMPLOS DE BASE64 (coloque os seus) ======
