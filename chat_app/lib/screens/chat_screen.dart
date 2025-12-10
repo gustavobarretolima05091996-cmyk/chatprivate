@@ -28,7 +28,7 @@ class ChatScreen extends StatefulWidget {
   State<ChatScreen> createState() => _ChatScreenState();
 }
 
-class _ChatScreenState extends State<ChatScreen> {
+class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   final TextEditingController msgCtrl = TextEditingController();
   final ScrollController _scrollCtrl = ScrollController();
   final SignalRService signalRService = SignalRService();
@@ -36,12 +36,80 @@ class _ChatScreenState extends State<ChatScreen> {
   List<Message> msgs = [];
   String? sender;
   bool _loading = false;
-  bool _connecting = true; // adicionar no estado
+  bool _connecting = true;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _initChat();
+  }
+
+  Future<void> _attemptReconnect() async {
+    if (sender == null) return;
+
+    int attempts = 0;
+    bool connected = false;
+
+    while (attempts < 3 && !connected) {
+      try {
+        await signalRService.reconnect();
+        connected = true;
+        print("SignalR reconectado com sucesso!");
+      } catch (e) {
+        attempts++;
+        print("Falha ao reconectar SignalR, tentativa $attempts: $e");
+        await Future.delayed(const Duration(seconds: 2));
+      }
+    }
+
+    if (!connected && mounted) {
+      await AuthService.logout();
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(builder: (_) => const LoginScreen()),
+      );
+    }
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _attemptReconnect();
+    }
+  }
+
+  Future<void> _reconnectSignalR() async {
+    if (sender == null) return;
+
+    int attempts = 0;
+    bool connected = false;
+
+    setState(() => _connecting = true);
+
+    while (attempts < 3 && !connected) {
+      try {
+        signalRService.dispose(); // fecha conexão antiga
+        await signalRService.init(sender!);
+        connected = true;
+        print("SignalR reconectado com sucesso!");
+      } catch (e) {
+        attempts++;
+        print("Falha ao reconectar SignalR, tentativa $attempts: $e");
+        await Future.delayed(const Duration(seconds: 2));
+      }
+    }
+
+    if (!connected && mounted) {
+      await AuthService.logout();
+      if (!mounted) return;
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(builder: (_) => const LoginScreen()),
+      );
+      return;
+    }
+
+    // reconectou
+    setState(() => _connecting = false);
   }
 
   @override
@@ -49,6 +117,7 @@ class _ChatScreenState extends State<ChatScreen> {
     msgCtrl.dispose();
     _scrollCtrl.dispose();
     signalRService.dispose();
+    WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
 
@@ -102,18 +171,29 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   Future<void> send(bool oneTime) async {
+    if (!signalRService.isConnected) {
+      try {
+        await signalRService.reconnect();
+      } catch (e) {
+        print("Não foi possível reconectar SignalR: $e");
+        return;
+      }
+    }
+
+
     final text = msgCtrl.text.trim();
     if (text.isEmpty || sender == null) return;
 
     setState(() => _loading = true);
 
+    final now = DateTime.now().toUtc().subtract(const Duration(hours: 3)); // Brasília
     final msg = Message(
       id: DateTime.now().millisecondsSinceEpoch.toString(),
       sender: sender!,
       text: text,
       oneTimeView: oneTime,
       opened: false,
-      timestamp: DateTime.now().toString(), // <-- adiciona timestamp
+      timestamp: now.toIso8601String(),
     );
 
     try {
@@ -139,12 +219,13 @@ class _ChatScreenState extends State<ChatScreen> {
 
   String formatTimestamp(String ts) {
     try {
-      final dt = DateTime.parse(ts).toUtc().subtract(const Duration(hours: 3)); // força UTC-3
-      final day = dt.day.toString().padLeft(2, '0');
-      final month = dt.month.toString().padLeft(2, '0');
-      final year = dt.year.toString();
-      final hour = dt.hour.toString().padLeft(2, '0');
-      final min = dt.minute.toString().padLeft(2, '0');
+      final dt = DateTime.parse(ts);
+      final br = dt.toUtc().subtract(const Duration(hours: 3)); // Brasília
+      final day = br.day.toString().padLeft(2, '0');
+      final month = br.month.toString().padLeft(2, '0');
+      final year = br.year.toString();
+      final hour = br.hour.toString().padLeft(2, '0');
+      final min = br.minute.toString().padLeft(2, '0');
       return "$day/$month/$year $hour:$min";
     } catch (e) {
       return ts;
@@ -190,10 +271,18 @@ class _ChatScreenState extends State<ChatScreen> {
     if (_connecting) {
       return const Scaffold(
         body: Center(
-          child: CircularProgressIndicator(),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              CircularProgressIndicator(),
+              SizedBox(height: 12),
+              Text("Conectando à sala..."),
+            ],
+          ),
         ),
       );
     }
+
     return Scaffold(
       appBar: AppBar(
         title: const Text("Sala da comunidade"),
@@ -291,7 +380,7 @@ class _ChatScreenState extends State<ChatScreen> {
                   alignment: isMine ? Alignment.centerRight : Alignment.centerLeft,
                   child: Container(
                     constraints: BoxConstraints(
-                      maxWidth: MediaQuery.of(context).size.width * 0.7, // <- balão ocupa no máximo 70% da tela
+                      maxWidth: MediaQuery.of(context).size.width * 0.7,
                     ),
                     padding: const EdgeInsets.all(12),
                     margin: const EdgeInsets.symmetric(vertical: 6),
