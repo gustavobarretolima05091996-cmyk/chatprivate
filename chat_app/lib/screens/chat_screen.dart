@@ -1,5 +1,7 @@
 import 'dart:math';
 import 'package:flutter/material.dart';
+import 'package:micommunity/screens/home_screen.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../services/SignalRService.dart';
 import '../services/api_service.dart';
 import '../models/message.dart';
@@ -37,12 +39,54 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   String? sender;
   bool _loading = false;
   bool _connecting = true;
+  String? role;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    _loadRole();
     _initChat();
+
+    signalRService.onForceGoHome.listen((_) async {
+      if (!mounted) return;
+
+      if (role == "PessoaA") {
+        await AuthService.logout();
+
+        if (!mounted) return;
+
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(builder: (_) => HomeScreen()),
+        );
+      }
+      if (role == "PessoaB") {
+        Future.microtask(() {
+          showDialog(
+            context: context,
+            builder: (_) => AlertDialog(
+              title: const Text("Usuário desconectado"),
+              content: const Text("Você desconectou a pessoa com sucesso."),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text("OK"),
+                ),
+              ],
+            ),
+          );
+        });
+        return;
+      }
+    });
+  }
+
+
+  Future<void> _loadRole() async {
+    final prefs = await SharedPreferences.getInstance();
+    setState(() {
+      role = prefs.getString("role");
+    });
   }
 
   Future<void> _attemptReconnect() async {
@@ -70,6 +114,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
       );
     }
   }
+
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
@@ -150,6 +195,10 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
 
     // Conectou com sucesso
     setState(() => _connecting = false);
+    // ADICIONAR AQUI — ouvir ClearMessages
+    signalRService.onClearMessages.listen((_) {
+      setState(() => msgs.clear());
+    });
 
     // Ouvir mensagens ao vivo
     signalRService.messages.listen((msg) {
@@ -287,6 +336,13 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
       appBar: AppBar(
         title: const Text("Sala da comunidade"),
         actions: [
+          if (role == "PessoaB")
+            IconButton(
+              icon: const Icon(Icons.warning, color: Colors.red),
+              onPressed: () async {
+                await signalRService.invokeForceGoHome("PessoaA");
+              },
+            ),
           IconButton(
             icon: const Icon(Icons.delete_forever),
             onPressed: () async {
@@ -307,6 +363,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
               );
               if (confirm == true) {
                 await ApiService.clearMessages();
+                await signalRService.invokeClearMessages();
                 setState(() => msgs.clear());
               }
             },
