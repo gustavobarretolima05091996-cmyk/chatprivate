@@ -44,13 +44,12 @@ class ApiService {
     }
   }
 
-  static Future<bool> login(String username, String password) async {
+  static Future<bool> login(String username) async {
     final res = await http.post(
       Uri.parse("$API_BASE/auth/login"),
       headers: {"Content-Type": "application/json"},
       body: jsonEncode({
         "username": username.trim().toLowerCase(),
-        "password": password.trim().toLowerCase(),
       }),
     );
 

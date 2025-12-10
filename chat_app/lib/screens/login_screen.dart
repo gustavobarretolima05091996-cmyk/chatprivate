@@ -25,8 +25,7 @@ class _LoginScreenState extends State<LoginScreen> {
     });
 
     final token = await ApiService.login(
-      user.text.trim(),
-      pass.text.trim(),
+      user.text.trim()
     );
 
     if (token) {
@@ -35,7 +34,7 @@ class _LoginScreenState extends State<LoginScreen> {
         MaterialPageRoute(builder: (_) => const ChatScreen()),
       );
     } else {
-      setState(() => errorMessage = "Usuário ou senha incorretos.");
+      setState(() => errorMessage = "Key inválida.");
     }
 
     setState(() => loading = false);
@@ -58,21 +57,13 @@ class _LoginScreenState extends State<LoginScreen> {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              const Text("Login",
+              const Text("Acesso MI Android",
                   style: TextStyle(fontSize: 32, fontWeight: FontWeight.bold)),
               const SizedBox(height: 20),
 
               TextField(
                 controller: user,
-                decoration: const InputDecoration(labelText: "Usuário"),
-              ),
-
-              const SizedBox(height: 12),
-
-              TextField(
-                controller: pass,
-                decoration: const InputDecoration(labelText: "Senha"),
-                obscureText: true,
+                decoration: const InputDecoration(labelText: "Chave KEY Android"),
               ),
 
               const SizedBox(height: 20),
@@ -91,7 +82,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 ),
                 child: loading
                     ? const CircularProgressIndicator(color: Colors.white)
-                    : const Text("Entrar", style: TextStyle(fontSize: 18)),
+                    : const Text("Acessar", style: TextStyle(fontSize: 18)),
               ),
 
               const SizedBox(height: 20),

@@ -1,10 +1,10 @@
-// models/message.dart
 class Message {
   final String id;
   final String sender;
   final String text;
   final bool oneTimeView;
   final bool opened;
+  final String timestamp; // nova propriedade
 
   Message({
     required this.id,
@@ -12,6 +12,7 @@ class Message {
     required this.text,
     required this.oneTimeView,
     required this.opened,
+    required this.timestamp, // adicione no construtor
   });
 
   factory Message.fromJson(Map<String, dynamic> json) {
@@ -21,6 +22,7 @@ class Message {
       text: json['text'] ?? "",
       oneTimeView: json['oneTimeView'] ?? false,
       opened: json['opened'] ?? false,
+      timestamp: json['timestamp'] ?? DateTime.now().toString(), // valor padrão
     );
   }
 
@@ -31,6 +33,7 @@ class Message {
       "text": text,
       "oneTimeView": oneTimeView,
       "opened": opened,
+      "timestamp": timestamp,
     };
   }
 
@@ -40,6 +43,7 @@ class Message {
     String? text,
     bool? singleView,
     bool? opened,
+    String? timestamp,
   }) {
     return Message(
       id: id ?? this.id,
@@ -47,6 +51,7 @@ class Message {
       text: text ?? this.text,
       oneTimeView: singleView ?? this.oneTimeView,
       opened: opened ?? this.opened,
+      timestamp: timestamp ?? this.timestamp,
     );
   }
 }

@@ -6,11 +6,14 @@ class SignalRService {
   late HubConnection _hubConnection;
   final StreamController<Message> _controller = StreamController.broadcast();
 
+
+
   Stream<Message> get messages => _controller.stream;
 
   Future<void> init(String role) async {
     _hubConnection = HubConnectionBuilder()
         .withUrl("https://chat.trampeiservicos.com.br/chatHub")
+        //.withUrl("https://10.0.2.2:7215/chatHub")
         .build();
 
     _hubConnection.onclose((error) => print("SignalR desconectado: $error"));

@@ -4,6 +4,7 @@ import '../services/SignalRService.dart';
 import '../services/api_service.dart';
 import '../models/message.dart';
 import '../services/auth_service.dart';
+import 'login_screen.dart';
 
 // Usuários e cores fake
 final List<String> randomNames = [
@@ -35,6 +36,7 @@ class _ChatScreenState extends State<ChatScreen> {
   List<Message> msgs = [];
   String? sender;
   bool _loading = false;
+  bool _connecting = true; // adicionar no estado
 
   @override
   void initState() {
@@ -54,7 +56,31 @@ class _ChatScreenState extends State<ChatScreen> {
     sender = await AuthService.getRole();
     if (sender == null) return;
 
-    await signalRService.init(sender!);
+    int attempts = 0;
+    bool connected = false;
+
+    while (attempts < 3 && !connected) {
+      try {
+        await signalRService.init(sender!);
+        connected = true;
+      } catch (e) {
+        attempts++;
+        print("Falha ao conectar SignalR, tentativa $attempts: $e");
+        await Future.delayed(const Duration(seconds: 2));
+      }
+    }
+
+    if (!connected) {
+      if (!mounted) return;
+      await AuthService.logout();
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(builder: (_) => const LoginScreen()),
+      );
+      return;
+    }
+
+    // Conectou com sucesso
+    setState(() => _connecting = false);
 
     // Ouvir mensagens ao vivo
     signalRService.messages.listen((msg) {
@@ -70,7 +96,7 @@ class _ChatScreenState extends State<ChatScreen> {
       });
     });
 
-    // Opcional: carregar mensagens antigas do backend
+    // Carregar mensagens antigas
     final fetched = await ApiService.getMessages();
     setState(() => msgs = fetched);
   }
@@ -87,6 +113,7 @@ class _ChatScreenState extends State<ChatScreen> {
       text: text,
       oneTimeView: oneTime,
       opened: false,
+      timestamp: DateTime.now().toString(), // <-- adiciona timestamp
     );
 
     try {
@@ -108,6 +135,20 @@ class _ChatScreenState extends State<ChatScreen> {
     };
     fakeProfiles[msgId] = profile;
     return profile;
+  }
+
+  String formatTimestamp(String ts) {
+    try {
+      final dt = DateTime.parse(ts).toUtc().subtract(const Duration(hours: 3)); // força UTC-3
+      final day = dt.day.toString().padLeft(2, '0');
+      final month = dt.month.toString().padLeft(2, '0');
+      final year = dt.year.toString();
+      final hour = dt.hour.toString().padLeft(2, '0');
+      final min = dt.minute.toString().padLeft(2, '0');
+      return "$day/$month/$year $hour:$min";
+    } catch (e) {
+      return ts;
+    }
   }
 
   Future<void> _viewOneTime(Message m) async {
@@ -146,6 +187,13 @@ class _ChatScreenState extends State<ChatScreen> {
 
   @override
   Widget build(BuildContext context) {
+    if (_connecting) {
+      return const Scaffold(
+        body: Center(
+          child: CircularProgressIndicator(),
+        ),
+      );
+    }
     return Scaffold(
       appBar: AppBar(
         title: const Text("Sala da comunidade"),
@@ -193,6 +241,9 @@ class _ChatScreenState extends State<ChatScreen> {
                   return Align(
                     alignment: isMine ? Alignment.centerRight : Alignment.centerLeft,
                     child: Container(
+                      constraints: BoxConstraints(
+                        maxWidth: MediaQuery.of(context).size.width * 0.7,
+                      ),
                       padding: const EdgeInsets.all(12),
                       margin: const EdgeInsets.symmetric(vertical: 6),
                       decoration: BoxDecoration(
@@ -204,8 +255,7 @@ class _ChatScreenState extends State<ChatScreen> {
                         children: [
                           Text(fake["name"],
                               style: TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  color: fake["color"])),
+                                  fontWeight: FontWeight.bold, color: fake["color"])),
                           const SizedBox(height: 6),
                           if (m.opened)
                             const Text("Visualização única aberta",
@@ -220,6 +270,17 @@ class _ChatScreenState extends State<ChatScreen> {
                               onPressed: () => _viewOneTime(m),
                               child: const Text("Ver agora (única)"),
                             ),
+                          if (m.opened || isMine)
+                            Align(
+                              alignment: Alignment.bottomRight,
+                              child: Text(
+                                formatTimestamp(m.timestamp),
+                                style: const TextStyle(
+                                  fontSize: 10,
+                                  color: Colors.black54,
+                                ),
+                              ),
+                            ),
                         ],
                       ),
                     ),
@@ -229,6 +290,9 @@ class _ChatScreenState extends State<ChatScreen> {
                 return Align(
                   alignment: isMine ? Alignment.centerRight : Alignment.centerLeft,
                   child: Container(
+                    constraints: BoxConstraints(
+                      maxWidth: MediaQuery.of(context).size.width * 0.7, // <- balão ocupa no máximo 70% da tela
+                    ),
                     padding: const EdgeInsets.all(12),
                     margin: const EdgeInsets.symmetric(vertical: 6),
                     decoration: BoxDecoration(
@@ -243,6 +307,17 @@ class _ChatScreenState extends State<ChatScreen> {
                                 color: fake["color"], fontWeight: FontWeight.bold)),
                         const SizedBox(height: 6),
                         Text(m.text),
+                        const SizedBox(height: 4),
+                        Align(
+                          alignment: Alignment.bottomRight,
+                          child: Text(
+                            formatTimestamp(m.timestamp),
+                            style: const TextStyle(
+                              fontSize: 10,
+                              color: Colors.black54,
+                            ),
+                          ),
+                        ),
                       ],
                     ),
                   ),
