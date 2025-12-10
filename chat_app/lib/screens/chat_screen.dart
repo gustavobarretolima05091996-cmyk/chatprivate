@@ -269,7 +269,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   String formatTimestamp(String ts) {
     try {
       final dt = DateTime.parse(ts);
-      final br = dt.toUtc().subtract(const Duration(hours: 3)); // Brasília
+      final br = dt.toUtc().subtract(const Duration(hours: 0)); // Brasília
       final day = br.day.toString().padLeft(2, '0');
       final month = br.month.toString().padLeft(2, '0');
       final year = br.year.toString();
