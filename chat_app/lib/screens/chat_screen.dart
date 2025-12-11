@@ -10,10 +10,8 @@ import 'login_screen.dart';
 
 // Usuários e cores fake
 final List<String> randomNames = [
-  "Lucas", "Amanda", "Bruno", "Carla", "Diego", "Elisa",
-  "Felipe", "Giovana", "Henrique", "Isabela", "João", "Karina",
-  "Luan", "Marina", "Nathan", "Olívia", "Paulo", "Rafaela",
-  "Samuel", "Tatiane", "Victor", "Yasmin", "Thiago", "Camila",
+  "User1", "User2", "User3", "User4", "User5", "User7",
+  "User6", "User8", "User9", "Isabela", "João", "Karina",
 ];
 
 final List<Color> userColors = [

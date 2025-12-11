@@ -22,7 +22,7 @@ class SignalRService {
 
   Future<void> init(String role) async {
     _hubConnection = HubConnectionBuilder()
-        .withUrl("https://chat.trampeiservicos.com.br/chatHub")
+        .withUrl("http://109.104.155.243:5000/chatHub")
         //.withUrl("https://10.0.2.2:7215/chatHub")
         .build();
 
